@@ -4,12 +4,13 @@
 #include "OrderBookEntry.h"
 #include "OrderBook.h"
 #include "Wallet.h"
+#include "User.h"
 
 
 class MerkelMain
 {
     public:
-        MerkelMain();
+        MerkelMain(User user);
         /** Call this to start the sim */
         void init();
     private: 
@@ -25,6 +26,7 @@ class MerkelMain
         void processUserOption(int userOption);
 
         std::string currentTime;
+        User currentUser;
 
         // OrderBook orderBook{"20200317.csv"};
 	OrderBook orderBook{"20200601.csv"};

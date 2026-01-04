@@ -13,6 +13,9 @@ add_executable(merklerex
         Wallet.cpp
         Candlestick.cpp
         CandlestickAnalyzer.cpp
+        User.cpp
+        UserManager.cpp
+        AuthenticationSystem.cpp
 )
 
 # Copy CSV data file to build directory

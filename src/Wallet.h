@@ -8,9 +8,11 @@
 class Wallet 
 {
     public:
-        Wallet();
+        Wallet(std::string userId = "");
         /** insert currency to the wallet */
         void insertCurrency(std::string type, double amount);
+        /** get the user ID associated with this wallet */
+        std::string getUserId() const;
         /** remove currency from the wallet */
         bool removeCurrency(std::string type, double amount);
         
@@ -30,6 +32,7 @@ class Wallet
 
         
     private:
+        std::string userId;
         std::map<std::string,double> currencies;
 
 };

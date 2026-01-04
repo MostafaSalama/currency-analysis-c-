@@ -6,7 +6,8 @@
 #include "CSVReader.h"
 #include "CandlestickAnalyzer.h"
 
-MerkelMain::MerkelMain()
+MerkelMain::MerkelMain(User user)
+: currentUser(user)
 {
 
 }
@@ -16,7 +17,17 @@ void MerkelMain::init()
     int input;
     currentTime = orderBook.getEarliestTime();
 
+    // Initialize wallet with default balance
     wallet.insertCurrency("BTC", 10);
+    wallet.insertCurrency("USDT", 10000);
+    wallet.insertCurrency("ETH", 100);
+
+    // Welcome message
+    std::cout << std::endl;
+    std::cout << "========================================" << std::endl;
+    std::cout << "Welcome to MerkelRex, " << currentUser.getFullName() << "!" << std::endl;
+    std::cout << "Username: " << currentUser.getUsername() << std::endl;
+    std::cout << "========================================" << std::endl;
 
     while(true)
     {
@@ -106,7 +117,7 @@ void MerkelMain::enterAsk()
                 tokens[0], 
                 OrderBookType::ask 
             );
-            obe.username = "simuser";
+            obe.username = currentUser.getUsername();
             if (wallet.canFulfillOrder(obe))
             {
                 std::cout << "Wallet looks good. " << std::endl;
@@ -142,7 +153,7 @@ void MerkelMain::enterBid()
                 tokens[0], 
                 OrderBookType::bid 
             );
-            obe.username = "simuser";
+            obe.username = currentUser.getUsername();
 
             if (wallet.canFulfillOrder(obe))
             {
@@ -175,7 +186,7 @@ void MerkelMain::gotoNextTimeframe()
         for (OrderBookEntry& sale : sales)
         {
             std::cout << "Sale price: " << sale.price << " amount " << sale.amount << std::endl; 
-            if (sale.username == "simuser")
+            if (sale.username == currentUser.getUsername())
             {
                 // update the wallet
                 wallet.processSale(sale);

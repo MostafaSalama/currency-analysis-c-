@@ -2,10 +2,16 @@
 #include <iostream>
 #include "CSVReader.h"
 
-Wallet::Wallet()
+Wallet::Wallet(std::string _userId)
+: userId(_userId)
 {
 
 
+}
+
+std::string Wallet::getUserId() const
+{
+    return userId;
 }
 
 void Wallet::insertCurrency(std::string type, double amount)
