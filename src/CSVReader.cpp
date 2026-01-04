@@ -26,7 +26,12 @@ std::vector<OrderBookEntry> CSVReader::readCSV(std::string csvFilename)
                 std::cout << "CSVReader::readCSV bad data"  << std::endl;
             }
         }// end of while
-    }    
+    }
+    else
+    {
+        std::cout << "CSVReader::readCSV could not open file: " << csvFilename << std::endl;
+        std::cout << "Make sure the CSV file is in the same directory as the executable." << std::endl;
+    }
 
     std::cout << "CSVReader::readCSV read " << entries.size() << " entries"  << std::endl;
     return entries; 

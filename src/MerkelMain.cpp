@@ -1,8 +1,10 @@
 #include "MerkelMain.h"
 #include <iostream>
 #include <vector>
+#include <iomanip>
 #include "OrderBookEntry.h"
 #include "CSVReader.h"
+#include "CandlestickAnalyzer.h"
 
 MerkelMain::MerkelMain()
 {
@@ -39,6 +41,8 @@ void MerkelMain::printMenu()
     std::cout << "5: Print wallet " << std::endl;
     // 6 continue   
     std::cout << "6: Continue " << std::endl;
+    // 7 view candlestick analysis
+    std::cout << "7: View Candlestick Analysis " << std::endl;
 
     std::cout << "============== " << std::endl;
 
@@ -182,12 +186,179 @@ void MerkelMain::gotoNextTimeframe()
 
     currentTime = orderBook.getNextTime(currentTime);
 }
+
+void MerkelMain::viewCandlestickAnalysis()
+{
+    std::cout << "=== Candlestick Analysis ===" << std::endl;
+    
+    // Step 1: Get product from user
+    std::cout << "Enter product (e.g., ETH/USDT, ETH/BTC, DOGE/BTC): ";
+    std::string product;
+    std::getline(std::cin, product);
+    
+    // Validate product exists
+    std::vector<std::string> knownProducts = orderBook.getKnownProducts();
+    bool productFound = false;
+    for (const std::string& p : knownProducts)
+    {
+        if (p == product)
+        {
+            productFound = true;
+            break;
+        }
+    }
+    
+    if (!productFound)
+    {
+        std::cout << "Error: Product '" << product << "' not found in the order book." << std::endl;
+        std::cout << "Available products: ";
+        for (size_t i = 0; i < knownProducts.size(); ++i)
+        {
+            std::cout << knownProducts[i];
+            if (i < knownProducts.size() - 1)
+                std::cout << ", ";
+        }
+        std::cout << std::endl;
+        return;
+    }
+    
+    // Step 2: Get time interval from user
+    std::cout << "Select time interval:" << std::endl;
+    std::cout << "  1: Per Second" << std::endl;
+    std::cout << "  2: Per Minute" << std::endl;
+    std::cout << "  3: All Time" << std::endl;
+    std::cout << "Enter choice (1-3): ";
+    std::string intervalInput;
+    std::getline(std::cin, intervalInput);
+    
+    CandlestickAnalyzer::TimeInterval interval;
+    int intervalChoice = 0;
+    try {
+        intervalChoice = std::stoi(intervalInput);
+    } catch(const std::exception& e) {
+        std::cout << "Invalid interval choice." << std::endl;
+        return;
+    }
+    
+    switch (intervalChoice)
+    {
+        case 1:
+            interval = CandlestickAnalyzer::SECOND;
+            break;
+        case 2:
+            interval = CandlestickAnalyzer::MINUTE;
+            break;
+        case 3:
+            interval = CandlestickAnalyzer::ALL;
+            break;
+        default:
+            std::cout << "Invalid interval choice. Please select 1, 2, or 3." << std::endl;
+            return;
+    }
+    
+    // Step 3: Get all orders from the order book
+    std::vector<OrderBookEntry> allOrders = orderBook.getOrders(OrderBookType::ask, product, currentTime);
+    // For analysis, we need all orders, not just current time
+    // Let's get the orders differently - we need access to all orders
+    // Since OrderBook doesn't expose all orders, we'll need to work with what we have
+    
+    // Generate candlesticks for ASKS
+    std::cout << "\n=== Candlestick Analysis: " << product << " (ASKS) ===" << std::endl;
+    std::cout << "Interval: " << CandlestickAnalyzer::intervalToString(interval) << std::endl;
+    std::cout << std::endl;
+    
+    // We need to collect all orders for this product across all timestamps
+    // Let's modify approach - collect all unique timestamps first
+    std::vector<std::string> timestamps;
+    std::string ts = orderBook.getEarliestTime();
+    timestamps.push_back(ts);
+    
+    // Collect all timestamps
+    for (int i = 0; i < 1000; ++i) // arbitrary limit to prevent infinite loop
+    {
+        std::string nextTs = orderBook.getNextTime(ts);
+        if (nextTs == timestamps[0]) // wrapped around
+            break;
+        timestamps.push_back(nextTs);
+        ts = nextTs;
+    }
+    
+    // Collect all orders for this product
+    std::vector<OrderBookEntry> allAsks;
+    std::vector<OrderBookEntry> allBids;
+    
+    for (const std::string& timestamp : timestamps)
+    {
+        std::vector<OrderBookEntry> asks = orderBook.getOrders(OrderBookType::ask, product, timestamp);
+        std::vector<OrderBookEntry> bids = orderBook.getOrders(OrderBookType::bid, product, timestamp);
+        allAsks.insert(allAsks.end(), asks.begin(), asks.end());
+        allBids.insert(allBids.end(), bids.begin(), bids.end());
+    }
+    
+    // Generate candlesticks for ASKS
+    std::vector<Candlestick> askCandlesticks = CandlestickAnalyzer::generateCandlesticks(
+        allAsks, product, OrderBookType::ask, interval);
+    
+    if (askCandlesticks.empty())
+    {
+        std::cout << "No ask data available for " << product << std::endl;
+    }
+    else
+    {
+        // Print header
+        std::cout << std::left << std::setw(20) << "Timeframe"
+                  << std::right << std::setw(10) << "Open"
+                  << std::setw(10) << "High"
+                  << std::setw(10) << "Low"
+                  << std::setw(10) << "Close"
+                  << std::setw(10) << "Volume" << std::endl;
+        std::cout << std::string(70, '-') << std::endl;
+        
+        // Print each candlestick
+        for (const Candlestick& candle : askCandlesticks)
+        {
+            std::cout << candle.toString() << std::endl;
+        }
+    }
+    
+    // Generate candlesticks for BIDS
+    std::cout << "\n=== Candlestick Analysis: " << product << " (BIDS) ===" << std::endl;
+    std::cout << "Interval: " << CandlestickAnalyzer::intervalToString(interval) << std::endl;
+    std::cout << std::endl;
+    
+    std::vector<Candlestick> bidCandlesticks = CandlestickAnalyzer::generateCandlesticks(
+        allBids, product, OrderBookType::bid, interval);
+    
+    if (bidCandlesticks.empty())
+    {
+        std::cout << "No bid data available for " << product << std::endl;
+    }
+    else
+    {
+        // Print header
+        std::cout << std::left << std::setw(20) << "Timeframe"
+                  << std::right << std::setw(10) << "Open"
+                  << std::setw(10) << "High"
+                  << std::setw(10) << "Low"
+                  << std::setw(10) << "Close"
+                  << std::setw(10) << "Volume" << std::endl;
+        std::cout << std::string(70, '-') << std::endl;
+        
+        // Print each candlestick
+        for (const Candlestick& candle : bidCandlesticks)
+        {
+            std::cout << candle.toString() << std::endl;
+        }
+    }
+    
+    std::cout << std::endl;
+}
  
 int MerkelMain::getUserOption()
 {
     int userOption = 0;
     std::string line;
-    std::cout << "Type in 1-6" << std::endl;
+    std::cout << "Type in 1-7" << std::endl;
     std::getline(std::cin, line);
     try{
         userOption = std::stoi(line);
@@ -203,7 +374,7 @@ void MerkelMain::processUserOption(int userOption)
 {
     if (userOption == 0) // bad input
     {
-        std::cout << "Invalid choice. Choose 1-6" << std::endl;
+        std::cout << "Invalid choice. Choose 1-7" << std::endl;
     }
     if (userOption == 1) 
     {
@@ -228,5 +399,9 @@ void MerkelMain::processUserOption(int userOption)
     if (userOption == 6) 
     {
         gotoNextTimeframe();
-    }       
+    }
+    if (userOption == 7)
+    {
+        viewCandlestickAnalysis();
+    }
 }
