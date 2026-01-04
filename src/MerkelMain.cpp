@@ -17,10 +17,28 @@ void MerkelMain::init()
     int input;
     currentTime = orderBook.getEarliestTime();
 
-    // Initialize wallet with default balance
-    wallet.insertCurrency("BTC", 10);
-    wallet.insertCurrency("USDT", 10000);
-    wallet.insertCurrency("ETH", 100);
+    // Try to load existing wallet, or initialize with defaults
+    if (!walletManager.loadWallet(currentUser.getUsername(), wallet))
+    {
+        // New wallet - initialize with default balance
+        wallet.insertCurrency("BTC", 10);
+        wallet.insertCurrency("USDT", 10000);
+        wallet.insertCurrency("ETH", 100);
+        
+        // Log initial balances
+        transactionLogger.logTransaction(currentUser.getUsername(), 
+                                         TransactionType::DEPOSIT, "BTC", 10.0, 10.0, 
+                                         "Initial balance");
+        transactionLogger.logTransaction(currentUser.getUsername(), 
+                                         TransactionType::DEPOSIT, "USDT", 10000.0, 10000.0, 
+                                         "Initial balance");
+        transactionLogger.logTransaction(currentUser.getUsername(), 
+                                         TransactionType::DEPOSIT, "ETH", 100.0, 100.0, 
+                                         "Initial balance");
+        
+        // Save initial wallet
+        walletManager.saveWallet(currentUser.getUsername(), wallet);
+    }
 
     // Welcome message
     std::cout << std::endl;
@@ -48,8 +66,8 @@ void MerkelMain::printMenu()
     std::cout << "3: Make an offer " << std::endl;
     // 4 make a bid 
     std::cout << "4: Make a bid " << std::endl;
-    // 5 print wallet
-    std::cout << "5: Print wallet " << std::endl;
+    // 5 wallet management
+    std::cout << "5: Wallet Management " << std::endl;
     // 6 continue   
     std::cout << "6: Continue " << std::endl;
     // 7 view candlestick analysis
@@ -190,6 +208,46 @@ void MerkelMain::gotoNextTimeframe()
             {
                 // update the wallet
                 wallet.processSale(sale);
+                
+                // Log the trade transaction
+                std::vector<std::string> currs = CSVReader::tokenise(sale.product, '/');
+                std::string currency = currs[0];
+                
+                // Get updated balance for this currency
+                std::map<std::string, double> currencies = wallet.getAllCurrencies();
+                double balance = 0.0;
+                if (currencies.find(currency) != currencies.end())
+                {
+                    balance = currencies[currency];
+                }
+                
+                if (sale.orderType == OrderBookType::asksale)
+                {
+                    // User sold currency (ask filled)
+                    transactionLogger.logTransaction(
+                        currentUser.getUsername(),
+                        TransactionType::TRADE_SELL,
+                        currency,
+                        sale.amount,
+                        balance,
+                        "Sold " + sale.product + " at " + std::to_string(sale.price)
+                    );
+                }
+                else if (sale.orderType == OrderBookType::bidsale)
+                {
+                    // User bought currency (bid filled)
+                    transactionLogger.logTransaction(
+                        currentUser.getUsername(),
+                        TransactionType::TRADE_BUY,
+                        currency,
+                        sale.amount,
+                        balance,
+                        "Bought " + sale.product + " at " + std::to_string(sale.price)
+                    );
+                }
+                
+                // Save updated wallet
+                walletManager.saveWallet(currentUser.getUsername(), wallet);
             }
         }
         
@@ -405,7 +463,7 @@ void MerkelMain::processUserOption(int userOption)
     }
     if (userOption == 5) 
     {
-        printWallet();
+        manageWallet();
     }
     if (userOption == 6) 
     {
@@ -414,5 +472,296 @@ void MerkelMain::processUserOption(int userOption)
     if (userOption == 7)
     {
         viewCandlestickAnalysis();
+    }
+}
+
+void MerkelMain::manageWallet()
+{
+    while (true)
+    {
+        std::cout << std::endl;
+        std::cout << "=== Wallet Management ===" << std::endl;
+        std::cout << "1: View Balance" << std::endl;
+        std::cout << "2: Deposit Funds" << std::endl;
+        std::cout << "3: Withdraw Funds" << std::endl;
+        std::cout << "4: View Recent Transactions" << std::endl;
+        std::cout << "5: View Statistics" << std::endl;
+        std::cout << "6: Back to Main Menu" << std::endl;
+        std::cout << "=========================" << std::endl;
+        
+        int option = 0;
+        std::string line;
+        std::cout << "Enter your choice (1-6): ";
+        std::getline(std::cin, line);
+        
+        try {
+            option = std::stoi(line);
+        } catch (const std::exception& e) {
+            option = 0;
+        }
+        
+        std::cout << "You chose: " << option << std::endl;
+        
+        if (option == 1)
+        {
+            printWallet();
+        }
+        else if (option == 2)
+        {
+            depositFunds();
+        }
+        else if (option == 3)
+        {
+            withdrawFunds();
+        }
+        else if (option == 4)
+        {
+            viewTransactions();
+        }
+        else if (option == 5)
+        {
+            viewStatistics();
+        }
+        else if (option == 6)
+        {
+            break; // Return to main menu
+        }
+        else
+        {
+            std::cout << "Invalid choice. Please select 1-6." << std::endl;
+        }
+    }
+}
+
+void MerkelMain::depositFunds()
+{
+    std::cout << std::endl;
+    std::cout << "=== Deposit Funds ===" << std::endl;
+    
+    std::string currency;
+    std::cout << "Enter currency (e.g., BTC, USDT, ETH): ";
+    std::getline(std::cin, currency);
+    
+    std::string amountStr;
+    std::cout << "Enter amount to deposit: ";
+    std::getline(std::cin, amountStr);
+    
+    try {
+        double amount = std::stod(amountStr);
+        
+        if (amount <= 0)
+        {
+            std::cout << "Error: Amount must be positive." << std::endl;
+            return;
+        }
+        
+        // Add to wallet
+        wallet.insertCurrency(currency, amount);
+        
+        // Get new balance
+        std::map<std::string, double> currencies = wallet.getAllCurrencies();
+        double newBalance = currencies[currency];
+        
+        // Log transaction
+        transactionLogger.logTransaction(currentUser.getUsername(),
+                                         TransactionType::DEPOSIT,
+                                         currency,
+                                         amount,
+                                         newBalance,
+                                         "Manual deposit");
+        
+        // Save wallet
+        walletManager.saveWallet(currentUser.getUsername(), wallet);
+        
+        std::cout << std::endl;
+        std::cout << "Deposit successful!" << std::endl;
+        std::cout << "New " << currency << " balance: " << newBalance << std::endl;
+    }
+    catch (const std::exception& e) {
+        std::cout << "Error: Invalid amount." << std::endl;
+    }
+}
+
+void MerkelMain::withdrawFunds()
+{
+    std::cout << std::endl;
+    std::cout << "=== Withdraw Funds ===" << std::endl;
+    
+    std::string currency;
+    std::cout << "Enter currency (e.g., BTC, USDT, ETH): ";
+    std::getline(std::cin, currency);
+    
+    std::string amountStr;
+    std::cout << "Enter amount to withdraw: ";
+    std::getline(std::cin, amountStr);
+    
+    try {
+        double amount = std::stod(amountStr);
+        
+        if (amount <= 0)
+        {
+            std::cout << "Error: Amount must be positive." << std::endl;
+            return;
+        }
+        
+        // Check if sufficient balance
+        if (!wallet.containsCurrency(currency, amount))
+        {
+            std::cout << "Error: Insufficient balance." << std::endl;
+            return;
+        }
+        
+        // Remove from wallet
+        if (wallet.removeCurrency(currency, amount))
+        {
+            // Get new balance
+            std::map<std::string, double> currencies = wallet.getAllCurrencies();
+            double newBalance = 0.0;
+            if (currencies.find(currency) != currencies.end())
+            {
+                newBalance = currencies[currency];
+            }
+            
+            // Log transaction
+            transactionLogger.logTransaction(currentUser.getUsername(),
+                                             TransactionType::WITHDRAW,
+                                             currency,
+                                             amount,
+                                             newBalance,
+                                             "Manual withdrawal");
+            
+            // Save wallet
+            walletManager.saveWallet(currentUser.getUsername(), wallet);
+            
+            std::cout << std::endl;
+            std::cout << "Withdrawal successful!" << std::endl;
+            std::cout << "New " << currency << " balance: " << newBalance << std::endl;
+        }
+        else
+        {
+            std::cout << "Error: Withdrawal failed." << std::endl;
+        }
+    }
+    catch (const std::exception& e) {
+        std::cout << "Error: Invalid amount." << std::endl;
+    }
+}
+
+void MerkelMain::viewTransactions()
+{
+    std::cout << std::endl;
+    std::cout << "=== Transaction History ===" << std::endl;
+    std::cout << "1: View Recent Transactions (last 5)" << std::endl;
+    std::cout << "2: View All Transactions" << std::endl;
+    std::cout << "3: View by Currency" << std::endl;
+    std::cout << "============================" << std::endl;
+    
+    int option = 0;
+    std::string line;
+    std::cout << "Enter your choice (1-3): ";
+    std::getline(std::cin, line);
+    
+    try {
+        option = std::stoi(line);
+    } catch (const std::exception& e) {
+        option = 0;
+    }
+    
+    std::vector<Transaction> transactions;
+    
+    if (option == 1)
+    {
+        transactions = transactionLogger.getRecentTransactions(currentUser.getUsername(), 5);
+        std::cout << std::endl;
+        std::cout << "=== Recent Transactions (Last 5) ===" << std::endl;
+    }
+    else if (option == 2)
+    {
+        transactions = transactionLogger.getAllTransactions(currentUser.getUsername());
+        std::cout << std::endl;
+        std::cout << "=== All Transactions ===" << std::endl;
+    }
+    else if (option == 3)
+    {
+        std::string currency;
+        std::cout << "Enter currency or product: ";
+        std::getline(std::cin, currency);
+        
+        transactions = transactionLogger.getTransactionsByProduct(currentUser.getUsername(), currency);
+        std::cout << std::endl;
+        std::cout << "=== Transactions for " << currency << " ===" << std::endl;
+    }
+    else
+    {
+        std::cout << "Invalid choice." << std::endl;
+        return;
+    }
+    
+    if (transactions.empty())
+    {
+        std::cout << "No transactions found." << std::endl;
+        return;
+    }
+    
+    std::cout << "User: " << currentUser.getFullName() << " (" << currentUser.getUsername() << ")" << std::endl;
+    std::cout << std::endl;
+    std::cout << std::left << std::setw(6) << "ID"
+              << std::setw(21) << "Timestamp"
+              << std::setw(14) << "Type"
+              << std::setw(10) << "Currency"
+              << std::right << std::setw(12) << "Amount"
+              << std::setw(12) << "Balance"
+              << "  Description" << std::endl;
+    std::cout << std::string(100, '-') << std::endl;
+    
+    for (const Transaction& trans : transactions)
+    {
+        std::cout << trans.toString() << std::endl;
+    }
+    std::cout << std::endl;
+}
+
+void MerkelMain::viewStatistics()
+{
+    std::cout << std::endl;
+    std::cout << "=== Statistics ===" << std::endl;
+    std::cout << "1: View All Statistics" << std::endl;
+    std::cout << "2: View Statistics by Product" << std::endl;
+    std::cout << "==================" << std::endl;
+    
+    int option = 0;
+    std::string line;
+    std::cout << "Enter your choice (1-2): ";
+    std::getline(std::cin, line);
+    
+    try {
+        option = std::stoi(line);
+    } catch (const std::exception& e) {
+        option = 0;
+    }
+    
+    StatisticsCalculator statsCalc(transactionLogger);
+    
+    if (option == 1)
+    {
+        UserStatistics stats = statsCalc.calculateStatistics(currentUser.getUsername());
+        statsCalc.displayStatistics(stats, currentUser.getFullName() + " (" + currentUser.getUsername() + ")");
+        
+        // Also show current wallet
+        std::cout << "Current Wallet Balance:" << std::endl;
+        std::cout << wallet.toString() << std::endl;
+    }
+    else if (option == 2)
+    {
+        std::string product;
+        std::cout << "Enter product (e.g., ETH/USDT): ";
+        std::getline(std::cin, product);
+        
+        UserStatistics stats = statsCalc.calculateStatisticsForProduct(currentUser.getUsername(), product);
+        statsCalc.displayProductStatistics(stats, currentUser.getFullName() + " (" + currentUser.getUsername() + ")", product);
+    }
+    else
+    {
+        std::cout << "Invalid choice." << std::endl;
     }
 }

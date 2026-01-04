@@ -5,6 +5,9 @@
 #include "OrderBook.h"
 #include "Wallet.h"
 #include "User.h"
+#include "WalletManager.h"
+#include "TransactionLogger.h"
+#include "StatisticsCalculator.h"
 
 
 class MerkelMain
@@ -22,11 +25,18 @@ class MerkelMain
         void printWallet();
         void gotoNextTimeframe();
         void viewCandlestickAnalysis();
+        void manageWallet();
+        void depositFunds();
+        void withdrawFunds();
+        void viewTransactions();
+        void viewStatistics();
         int getUserOption();
         void processUserOption(int userOption);
 
         std::string currentTime;
         User currentUser;
+        WalletManager walletManager;
+        TransactionLogger transactionLogger;
 
         // OrderBook orderBook{"20200317.csv"};
 	OrderBook orderBook{"20200601.csv"};

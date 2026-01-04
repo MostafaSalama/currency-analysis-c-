@@ -135,3 +135,13 @@ std::ostream& operator<<(std::ostream& os,  Wallet& wallet)
     return os;
 }
 
+std::map<std::string, double> Wallet::getAllCurrencies() const
+{
+    return currencies;
+}
+
+void Wallet::setCurrencies(const std::map<std::string, double>& _currencies)
+{
+    currencies = _currencies;
+}
+

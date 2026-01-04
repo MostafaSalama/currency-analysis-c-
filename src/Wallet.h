@@ -30,6 +30,12 @@ class Wallet
         std::string toString();
         friend std::ostream& operator<<(std::ostream& os, Wallet& wallet);
 
+        /** get all currencies and balances */
+        std::map<std::string, double> getAllCurrencies() const;
+
+        /** set currencies from map (for loading from CSV) */
+        void setCurrencies(const std::map<std::string, double>& currencies);
+
         
     private:
         std::string userId;

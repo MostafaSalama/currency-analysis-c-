@@ -16,6 +16,10 @@ add_executable(merklerex
         User.cpp
         UserManager.cpp
         AuthenticationSystem.cpp
+        Transaction.cpp
+        WalletManager.cpp
+        TransactionLogger.cpp
+        StatisticsCalculator.cpp
 )
 
 # Copy CSV data file to build directory
